@@ -30,7 +30,10 @@ const Users = () => {
   const [searchParams] = useSearchParams();
   const [searchTerm] = useState(searchParams.get("search") || "");
 
-  const { data, isLoading, refetch } = useGetTeamListsQuery({ search: searchTerm });
+  const { data, isLoading, refetch } = useGetTeamListsQuery({
+    search: searchTerm,
+    excludeRole: "Student",
+  });
   const [deleteUser] = useDeleteUserMutation();
   const [userAction] = useUserActionMutation();
 

@@ -1,10 +1,11 @@
 import { useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
-import { useSelector } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { useNavigate, Link } from "react-router-dom";
 import { toast } from "sonner";
 import { Button, Loading, Textbox } from "../components";
 import { useRegisterMutation } from "../redux/slices/api/authApiSlice";
+import { setCredentials } from "../redux/slices/authSlice";
 
 const ROLES = ["Admin", "Principal", "HOD", "Faculty", "Student"];
 const DEPARTMENTS = ["COMP", "IT", "ENTC", "MECH", "CIVIL", "OTHER"];
@@ -14,6 +15,7 @@ const FACULTY_ROLES = ["Faculty", "Student Incharge", "Project Guide"];
 const Register = () => {
   const { user } = useSelector((state) => state.auth);
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const [registerUser, { isLoading }] = useRegisterMutation();
 
   const {
@@ -54,7 +56,31 @@ const Register = () => {
     try {
       const res = await registerUser(payload).unwrap();
       toast.success(res?.message || "Registered");
-      navigate("/log-in");
+
+      const userData = res?.user;
+      const roleValue = userData?.role || payload?.role;
+      const isApproved =
+        userData?.status === "approved" ||
+        userData?.isAdmin ||
+        roleValue === "Admin";
+
+      if (userData && isApproved) {
+        dispatch(setCredentials(userData));
+
+        if (userData?.isAdmin || roleValue === "Admin") {
+          navigate("/admin-dashboard");
+        } else if (roleValue === "HOD") {
+          navigate("/hod-dashboard");
+        } else if (roleValue === "Faculty") {
+          navigate("/faculty-dashboard");
+        } else if (roleValue === "Student") {
+          navigate("/student-dashboard");
+        } else {
+          navigate("/employee-dashboard");
+        }
+      } else {
+        navigate("/log-in");
+      }
     } catch (err) {
       toast.error(err?.data?.message || err.error);
     }

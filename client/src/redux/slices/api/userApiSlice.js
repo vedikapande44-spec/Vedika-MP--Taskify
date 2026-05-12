@@ -29,6 +29,7 @@ export const userApiSlice = apiSlice.injectEndpoints({
         year = "",
         section = "",
         role = "",
+        excludeRole = "",
       } = {}) => {
         const q = new URLSearchParams();
         q.set("search", search);
@@ -37,6 +38,7 @@ export const userApiSlice = apiSlice.injectEndpoints({
         q.set("year", year);
         q.set("section", section);
         q.set("role", role);
+        q.set("excludeRole", excludeRole);
         return {
           url: `${USERS_URL}/users?${q.toString()}`,
           method: "GET",

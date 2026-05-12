@@ -401,9 +401,48 @@ const logoutUser = (req, res) => {
  * - scope=chat: all approved users (for chat invites)
  */
 const getTeamList = asyncHandler(async (req, res) => {
-  const { search, scope, department, year, section, role } = req.query;
+  const { search, scope, department, year, section, role, excludeRole } = req.query;
   const forChat = scope === "chat";
   const requestedRole = normalizeRole(role);
+  const excludedRole = normalizeRole(excludeRole);
+
+  const applyRoleExclusion = (queryObj, excluded) => {
+    if (!excluded) return queryObj;
+
+    const out = { ...queryObj };
+    const cond = out.role;
+
+    // If caller requested an explicit role, honor it.
+    if (cond && typeof cond === "string") {
+      return out;
+    }
+
+    if (!cond) {
+      out.role = { $ne: excluded };
+      return out;
+    }
+
+    if (typeof cond === "object" && cond !== null) {
+      if (Array.isArray(cond.$in)) {
+        const next = cond.$in.filter((r) => normalizeRole(r) !== excluded);
+        if (next.length === 0) {
+          out.role = "__NO_MATCH__";
+        } else {
+          out.role = { ...cond, $in: next };
+        }
+      } else if (typeof cond.$regex === "string") {
+        // Leave regex-based role searches unchanged.
+      } else if (typeof cond.$ne === "string") {
+        // Already excluded something; keep it.
+      } else {
+        out.role = { ...cond, $ne: excluded };
+      }
+      return out;
+    }
+
+    out.role = { $ne: excluded };
+    return out;
+  };
 
   const requester = await User.findById(req.user.userId).select(
     "name title role email prn department year section isAdmin status"
@@ -484,9 +523,18 @@ const getTeamList = asyncHandler(async (req, res) => {
     return res.status(200).json([]);
   }
 
-  const query = { ...baseQuery, ...visibilityQuery };
+  let query = { ...baseQuery, ...visibilityQuery };
   if (requestedRole) {
     query.role = requestedRole;
+  }
+
+  // Team page should not include Students; enforce via query param.
+  // (Students page explicitly requests role=Student.)
+  if (!requestedRole && excludedRole && !forChat) {
+    query = applyRoleExclusion(query, excludedRole);
+    if (query.role === "__NO_MATCH__") {
+      return res.status(200).json([]);
+    }
   }
 
   if (search) {
